@@ -1,0 +1,259 @@
+import tkinter as tk
+from tkinter import filedialog, ttk, messagebox
+from PIL import Image, ImageTk
+import cv2
+import os
+from datetime import datetime
+
+class DeltaAutomations:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Delta Automations")
+        self.root.geometry("1000x700")
+        
+        # Colors
+        self.black = "#000000"
+        self.orange = "#FF8C00"
+        self.gray = "#1a1a1a"
+        
+        self.root.configure(bg=self.black)
+        
+        # Variables
+        self.file_path = tk.StringVar()
+        self.lower_threshold = tk.IntVar(value=70)
+        self.upper_threshold = tk.IntVar(value=135)
+        self.current_image = None
+        self.sketch_image = None
+        
+        # Logo path
+        self.logo_path = r"C:\Users\Abijith\Desktop\delta.jpg"
+        
+        self.create_gui()
+    
+    def create_gui(self):
+        # Header Frame
+        header_frame = tk.Frame(self.root, bg=self.black)
+        header_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # Logo Frame (includes logo and credits)
+        logo_frame = tk.Frame(header_frame, bg=self.black)
+        logo_frame.pack(side=tk.LEFT)
+        
+        # Load and display custom logo
+        try:
+            # Load logo image
+            logo_image = Image.open(self.logo_path)
+            # Resize logo to 50x50
+            logo_image = logo_image.resize((50, 50), Image.Resampling.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            
+            # Create label for logo
+            logo_label = tk.Label(logo_frame, image=logo_photo, bg=self.black)
+            logo_label.image = logo_photo  # Keep a reference
+            logo_label.pack()
+        except Exception as e:
+            print(f"Error loading logo: {e}")
+            # Fallback to text logo
+            logo_label = tk.Label(
+                logo_frame,
+                text="D",
+                font=("Arial", 30, "bold"),
+                bg=self.black,
+                fg=self.orange
+            )
+            logo_label.pack()
+        
+        # Add developer credits below logo
+        credits_label = tk.Label(
+            logo_frame,
+            text="Developer: Abijith A B",
+            font=("Arial", 8),
+            bg=self.black,
+            fg=self.orange
+        )
+        credits_label.pack(pady=(2, 0))
+        
+        # Company name
+        tk.Label(
+            header_frame,
+            text="Delta Automations",
+            font=("Arial", 20, "bold"),
+            bg=self.black,
+            fg=self.orange
+        ).pack(side=tk.LEFT, padx=20)
+        
+        # Image Display Frame
+        display_frame = tk.Frame(self.root, bg=self.black)
+        display_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Original Image Frame
+        original_frame = tk.Frame(display_frame, bg=self.gray)
+        original_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        
+        tk.Label(
+            original_frame,
+            text="Original Image",
+            bg=self.gray,
+            fg=self.orange,
+            font=("Arial", 12)
+        ).pack(pady=5)
+        
+        self.original_label = tk.Label(original_frame, bg=self.gray)
+        self.original_label.pack(expand=True)
+        
+        # Sketch Frame
+        sketch_frame = tk.Frame(display_frame, bg=self.gray)
+        sketch_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
+        
+        tk.Label(
+            sketch_frame,
+            text="Sketch",
+            bg=self.gray,
+            fg=self.orange,
+            font=("Arial", 12)
+        ).pack(pady=5)
+        
+        self.sketch_label = tk.Label(sketch_frame, bg=self.gray)
+        self.sketch_label.pack(expand=True)
+        
+        # Controls Frame
+        controls_frame = tk.Frame(self.root, bg=self.black)
+        controls_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # Button style
+        button_style = {
+            "bg": self.orange,
+            "fg": "white",
+            "font": ("Arial", 10),
+            "relief": tk.FLAT,
+            "padx": 20,
+            "pady": 5
+        }
+        
+        # Upload Button
+        upload_btn = tk.Button(
+            controls_frame,
+            text="Upload Image",
+            command=self.browse_file,
+            **button_style
+        )
+        upload_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Threshold Controls
+        tk.Label(
+            controls_frame,
+            text="Lower Threshold:",
+            bg=self.black,
+            fg=self.orange
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Scale(
+            controls_frame,
+            from_=0,
+            to=255,
+            variable=self.lower_threshold,
+            command=self.update_sketch
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(
+            controls_frame,
+            text="Upper Threshold:",
+            bg=self.black,
+            fg=self.orange
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Scale(
+            controls_frame,
+            from_=0,
+            to=255,
+            variable=self.upper_threshold,
+            command=self.update_sketch
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Download Button
+        self.download_btn = tk.Button(
+            controls_frame,
+            text="Download Sketch",
+            command=self.save_sketch,
+            state=tk.DISABLED,
+            **button_style
+        )
+        self.download_btn.pack(side=tk.RIGHT, padx=5)
+    
+    def browse_file(self):
+        filename = filedialog.askopenfilename(
+            filetypes=[
+                ("Image Files", "*.jpg *.jpeg *.png *.bmp *.gif"),
+                ("All Files", "*.*")
+            ]
+        )
+        if filename:
+            self.file_path.set(filename)
+            self.load_image()
+    
+    def load_image(self):
+        try:
+            # Load and display original image
+            self.current_image = cv2.imread(self.file_path.get())
+            if self.current_image is not None:
+                self.display_image(self.current_image, self.original_label)
+                self.update_sketch()
+                self.download_btn.config(state=tk.NORMAL)
+            else:
+                messagebox.showerror("Error", "Could not load image file")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading image: {str(e)}")
+    
+    def update_sketch(self, *args):
+        if self.current_image is not None:
+            # Process image using Canny edge detection
+            gray = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2GRAY)
+            blurred = cv2.GaussianBlur(src=gray, ksize=(3, 5), sigmaX=0.5)
+            edges = cv2.Canny(blurred, self.lower_threshold.get(), self.upper_threshold.get())
+            self.sketch_image = cv2.bitwise_not(edges)
+            
+            # Display sketch
+            self.display_image(self.sketch_image, self.sketch_label)
+    
+    def display_image(self, image, label):
+        # Convert from BGR to RGB if needed
+        if len(image.shape) == 3:
+            display_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            display_image = image
+            
+        # Convert to PIL Image
+        pil_image = Image.fromarray(display_image)
+        
+        # Resize while maintaining aspect ratio
+        display_size = (400, 400)
+        pil_image.thumbnail(display_size, Image.Resampling.LANCZOS)
+        
+        # Convert to PhotoImage
+        photo = ImageTk.PhotoImage(pil_image)
+        
+        # Update label
+        label.config(image=photo)
+        label.image = photo
+    
+    def save_sketch(self):
+        if self.sketch_image is not None:
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_name = f"sketch_{timestamp}.png"
+            
+            # Open save dialog
+            filename = filedialog.asksaveasfilename(
+                initialfile=default_name,
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("All files", "*.*")]
+            )
+            
+            if filename:
+                cv2.imwrite(filename, self.sketch_image)
+                messagebox.showinfo("Success", "Sketch saved successfully!")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DeltaAutomations(root)
+    root.mainloop()
